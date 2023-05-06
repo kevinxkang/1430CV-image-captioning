@@ -9,7 +9,7 @@ The only tokens we use are start, end, OOV and pad tokens.
 
 #TODO: 
 Currently, spacy preprocessing is in coco120k, flickr8k and flickr30k. But it is probably better here. When everything
-is working, we can change it and get it working. 
+is working, we can change it and get it working. I'm not sure exactly what's the best standard
 """
 class TextPreprocessor:
     """
@@ -19,7 +19,7 @@ class TextPreprocessor:
     Vocab_size: Size of the vocabulary used --> This will come into help when using embeddings 
     use_spacy: Whether to use spacy
     """
-    def __init__(self, all_captions, max_caption_length=15, vocab_size=5000, use_spacy=False):
+    def __init__(self, all_captions, max_caption_length=15, vocab_size=5000, use_spacy=True):
         self.use_spacy = use_spacy
         self.captions = self.process_captions(all_captions)
         self.tokenizer = Tokenizer(num_words=vocab_size, oov_token='<unk>', filters='!"#$%&()*+.,-/:;=?@[\]^_`{|}~ ')
@@ -62,7 +62,7 @@ class TextPreprocessor:
     Tokenize and pad the captions
     """
     def tokenize(self, captions):
-        captions = ['<start> ' + caption + ' <end>' for caption in captions]
+        captions = ['<start> ' + str(caption) + ' <end>' for caption in captions]
         sequences = self.tokenizer.texts_to_sequences(captions)
         padded_sequences = pad_sequences(sequences, maxlen=self.max_caption_length, padding='post')
         return padded_sequences
