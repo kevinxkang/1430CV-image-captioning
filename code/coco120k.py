@@ -33,13 +33,13 @@ def load_image_external(image_id, image_paths, preprocessing_steps, r_image_heig
 In order to use keras, inhereting from a sequence allows us to take advantage of multiprocessing for large datasets. This will help for bigger data as well. Using a DataGenerator class speeds process up
 """
 class Coco120KDataset(Sequence):
-    def __init__(self, train_image_dir, val_image_dir, train_caption_file, val_caption_file, batch_size=32, preprocessing=['resize', 'normalize', 'augment'], combine=True, max_samples=None):
+    def __init__(self, train_image_dir, val_image_dir, train_caption_file, val_caption_file, batch_size=32, preprocessing=['resize', 'normalize', 'augment'], combine=True, tokenize=True):
         self.train_image_dir = train_image_dir
         self.val_image_dir = val_image_dir
         self.preprocessing_steps = preprocessing
         self.r_image_height = 224
         self.r_image_width = 224
-        self.max_samples = max_samples
+        self.tokenize = tokenize
         self.combine = combine
         self.index_dict = {}
 
@@ -129,6 +129,8 @@ class Coco120KDataset(Sequence):
                 for token in doc
                 if not token.is_stop and not token.is_punct and not token.like_num
             ]
+            if not self.tokenize:
+                tokens = ' '.join(tokens)
             processed_captions.append(tokens)
         return processed_captions 
 

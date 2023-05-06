@@ -26,7 +26,7 @@ class Flickr8kDataset(Sequence):
     captions_file (str) Filename of the file with captions
     batch_size: (Optional[int]): Batch size used for batching of the dataset. 32 is the default value 
     """
-    def __init__(self, image_dir, captions_file, batch_size=32, preprocessing=['resize', 'normalize', 'augment']):
+    def __init__(self, image_dir, captions_file, batch_size=32, preprocessing=['resize', 'normalize', 'augment'], tokenize=True):
         self.image_dir = image_dir
         self.image_dict = None
         self.mean = None 
@@ -34,6 +34,7 @@ class Flickr8kDataset(Sequence):
         self.preprocessing_steps = preprocessing
         self.r_image_height = 224
         self.r_image_width = 224
+        self.tokenize = tokenize
         
         
         self.captions = self.load_captions(captions_file)
@@ -77,6 +78,8 @@ class Flickr8kDataset(Sequence):
                 for token in doc
                 if not token.is_stop and not token.is_punct and not token.like_num
             ]
+            if not self.tokenize:
+                tokens = ' '.join(tokens)
             processed_captions.append(tokens)
         return processed_captions
 
@@ -203,7 +206,6 @@ class Flickr8kDataset(Sequence):
         batch_images = [self.images[i] for i in batch_indices]
         batch_unprocessed_captions = [self.captions[image_id] for image_id in batch_image_ids]
         
-        print("Unprocessed", batch_unprocessed_captions)
         
         batch_captions = [self.process_caption(caption) for caption in batch_unprocessed_captions]
         
