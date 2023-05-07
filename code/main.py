@@ -1,35 +1,67 @@
-from flickr8k import Flickr8kDataset
-from flickr30k import Flickr30kDataset
-from coco120k import Coco120KDataset
-from tokenizer import TextPreprocessor
-import shutil
 import os
-import matplotlib.pyplot as plt
+import argparse
+import pickle
+import numpy as np
+from  architecture.model import ImageCaptionModel
 
-if __name__ == "__main__":
-    flickr_8kdataset = Flickr8kDataset("/Users/onrmmm78/Desktop/cs1430/finalproject-mithunramesh19/data/flickr8k_images/", "/Users/onrmmm78/Desktop/cs1430/finalproject-mithunramesh19/data/flickr8k_images/captions.txt")
-    # flickr_30kdataset = Flickr30kDataset("/Users/onrmmm78/Desktop/cs1430/finalproject-mithunramesh19/data/flickr30k_images/", "/Users/onrmmm78/Desktop/cs1430/finalproject-mithunramesh19/data/flickr30k_images/results.csv")
-    # coco120k_imags = Coco120KDataset("/Users/onrmmm78/Desktop/cs1430/finalproject-mithunramesh19/data/coco_120k/train2014/train2014/","/Users/onrmmm78/Desktop/cs1430/finalproject-mithunramesh19/data/coco_120k/val2014/val2014/","/Users/onrmmm78/Desktop/cs1430/finalproject-mithunramesh19/data/coco_120k/captions/annotations/captions_train2014.json", "/Users/onrmmm78/Desktop/cs1430/finalproject-mithunramesh19/data/coco_120k/captions/annotations/captions_val2014.json", max_samples=30000)
-    
-    batch_images, batch_unprocess_captions, batch_processed_captions = flickr_8kdataset[1]
-    plt.imshow(batch_images[0].astype("uint8"))
-    plt.show()
-    print("Captions for the first image:")
-    print("Captions for the first image:")
-    print(batch_unprocess_captions[0])
-    print(batch_processed_captions[0])
-    
-    
-    
-    # # Instantiate a TextPreprocessor object
-    # preprocessor = TextPreprocessor(batch_unprocess_captions)
+from datasets.preprocess import DatasetProcessor
 
-    # # Tokenize and pad the captions
-    # tokenized_captions = preprocessor.tokenize(batch_unprocess_captions)
-    # untokenized_captions = preprocessor.detokenize(tokenized_captions)
-    # # Print the tokenized captions
-    # print(tokenized_captions[0])
-    # print(untokenized_captions)
+def parse_args(args=None):
+    """
+    Command line argument parser
+    """
+
+    parser = argparse.ArgumentParser(description="JELLYFAM's Image Captioning Project", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    #Avalible arguments
+    parser.add_argument("--dataset", required=True, type=str, default="flickr8k", help="Dataset to be used for training")
+    parser.add_argument("--task", required=True, type=str, choices=["train", "test", "both"], default="train", help="Task to be performed")
+    parser.add_argument("--processed", required=True, type=bool, default=False, help="If data has already been pre-processed")
+    # parser.add_argument("--decoder", required=True, type=str, default="lstm", help="Decoder to be used for training")
+    # parser.add_argument('--epochs',         type=int,   default=3,      help='Number of epochs used in training.')
+    # parser.add_argument('--lr',             type=float, default=1e-3,   help='Model\'s learning rate')
+
+    if args is None: 
+        return parser.parse_args()      ## For calling through command line
+    return parser.parse_args(args)      ## For calling through notebook.
+
+
+def main(args):
+
+    # Load Data
+    if args.processed:
+        with open(f'../data/{args.dataset}/{args.dataset}.p', 'rb') as data_file:
+            data_dict = pickle.load(data_file)
+    else:
+        dataset = DatasetProcessor(args.dataset)
+        data_dict = dataset.data_dict
+
+    train_captions = data_dict["train_captions"]
+    test_captions = data_dict["test_captions"]
+    train_image_features = data_dict["train_image_features"]
+    test_image_features = data_dict["test_image_features"]
+    word2idx = data_dict["word2idx"]
+    idx2word = data_dict["idx2word"]
+
+    if args.task in ["train", "both"]:
+        # Train Model
+        decoder = {
+           #TODO 
+        }
+
+        print("Training Model...")
+        # print(train_image_features)
+        model = ImageCaptionModel(decoder)
+        
+
+        
+
+if __name__ == '__main__':
+    main(parse_args())
+
+
+
+
+
+
     
-    # # # print(batch_unprocess_captions[0])
-    # # print(batch_processed_captions[0])
