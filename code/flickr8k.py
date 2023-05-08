@@ -13,6 +13,12 @@ from PIL import Image
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
+from tensorflow.keras.applications import VGG16, ResNet50, InceptionV3
+from tensorflow.keras.applications.vgg16 import preprocess_input as vgg_preprocess
+from tensorflow.keras.applications.resnet50 import preprocess_input as resnet_preprocess
+from tensorflow.keras.applications.inception_v3 import preprocess_input as inception_preprocess
+from tensorflow.keras.models import Model
+import pickle
 
 nlp = spacy.load("en_core_web_sm", disable=["tagger", "parser", "ner"])
 """
@@ -26,7 +32,7 @@ class Flickr8kDataset(Sequence):
     captions_file (str) Filename of the file with captions
     batch_size: (Optional[int]): Batch size used for batching of the dataset. 32 is the default value 
     """
-    def __init__(self, image_dir, captions_file, batch_size=32, preprocessing=['resize', 'normalize', 'augment'], tokenize=True):
+    def __init__(self, image_dir, captions_file, batch_size=32, preprocessing=['resize', 'normalize', 'augment'], tokenize=True, feature_extractor="VGG16", split_ratio=0.8, pickle_file=True):
         self.image_dir = image_dir
         self.image_dict = None
         self.mean = None 
@@ -49,7 +55,9 @@ class Flickr8kDataset(Sequence):
         self.horizontal_flip = True
         
         self.augment = False
+        self.model = None
         
+        self.split_ratio = split_ratio
         
         if 'augment' in preprocessing:
             self.augment = True
@@ -63,6 +71,47 @@ class Flickr8kDataset(Sequence):
             )
         else:
             self.data_generator = ImageDataGenerator()
+
+        # Adding a feature extractor attribute
+        self.feature_extractor = feature_extractor
+
+        # Loading pre-extracted image features or extracting them
+        if pickle_file and os.path.exists(pickle_file):
+            self.load_pickle_data(pickle_file)
+        else:
+            self.images = self.pre_extract_image_features(self.images)
+            if pickle_file:
+                self.save_pickle_data(pickle_file)
+                
+    def preprocess_input(self, image):
+        if self.feature_extractor == "VGG16":
+            return vgg_preprocess(image)
+        elif self.feature_extractor == "ResNet50":
+            return resnet_preprocess(image)
+        elif self.feature_extractor == "InceptionV3":
+            return inception_preprocess(image)
+
+    def extract_image_features(self, image):
+        img = np.expand_dims(image, axis=0)
+        img = self.preprocess_input(img)
+        features = self.model.predict(img)
+        features = np.reshape(features, (features.shape[1], -1))
+        return features
+
+    def pre_extract_image_features(self, images):
+        if self.feature_extractor == "VGG16":
+            base_model = VGG16(weights='imagenet', include_top=False)
+        elif self.feature_extractor == "ResNet50":
+            base_model = ResNet50(weights='imagenet', include_top=False)
+        elif self.feature_extractor == "InceptionV3":
+            base_model = InceptionV3(weights='imagenet', include_top=False)
+
+        self.model = Model(inputs=base_model.input, outputs=base_model.output)
+        
+        with ThreadPoolExecutor() as executor:
+            image_features = list(executor.map(self.extract_image_features, images))
+
+        return image_features
         
     """
     Purpose: This function processes the captions with various NLP tactics 
@@ -185,6 +234,17 @@ class Flickr8kDataset(Sequence):
         processed_images = [self.normalize_image(img) if 'normalize' in self.preprocessing_steps else img for img in loaded_images]
 
         return processed_images
+    
+    """
+    Pickle the data
+    """
+    def save_pickle_data(self, pickle_file):
+        with open(pickle_file, 'wb') as f:
+            pickle.dump((self.images, self.captions, self.image_ids, self.index_dict, self.mean, self.std), f)
+
+    def load_pickle_data(self, pickle_file):
+        with open(pickle_file, 'rb') as f:
+            self.images, self.captions, self.image_ids, self.index_dict, self.mean, self.std = pickle.load(f)
         
     """
     Must implement for the SequenceClass
@@ -203,25 +263,11 @@ class Flickr8kDataset(Sequence):
     def __getitem__(self, idx):
         batch_image_ids = self.image_ids[idx * self.batch_size:(idx + 1) * self.batch_size]
         batch_indices = [self.index_dict[image_id] for image_id in batch_image_ids]
-        batch_images = [self.images[i] for i in batch_indices]
+        batch_image_features = [self.images[i] for i in batch_indices]
         batch_unprocessed_captions = [self.captions[image_id] for image_id in batch_image_ids]
-        
-        
+
         batch_captions = [self.process_caption(caption) for caption in batch_unprocessed_captions]
-        
-        print("Augmenting")
-        if self.augment:
-            batch_images = np.array(batch_images)
-            augmented_images = []
-            for image in batch_images:
-                # Reshape the image to add the batch dimension (required by ImageDataGenerator)
-                image = image[np.newaxis]
-                # Generate a single augmented image
-                augmented_image = next(self.data_generator.flow(image, batch_size=1))
-                # Remove the batch dimension
-                augmented_image = np.squeeze(augmented_image, axis=0)
-                augmented_images.append(augmented_image)
-            batch_images = np.array(augmented_images)
-            
-        return np.array(batch_images), np.array(batch_unprocessed_captions), np.array(batch_captions)
+
+        return np.array(batch_image_features), np.array(batch_unprocessed_captions), np.array(batch_captions)
+
 
