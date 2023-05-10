@@ -1,0 +1,61 @@
+<!-- index.html (HTML and JavaScript with image preview) -->
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Image Captioning</title>
+</head>
+<body>
+  <h1>Image Captioning</h1>
+  <form id="uploadForm" enctype="multipart/form-data">
+    <input type="file" name="file" id="fileInput" accept="image/*">
+    <select name="model" id="modelSelect">
+      <option value="model1">Fine Tuned</option>
+      <option value="model2">Non-Fine Tuned</option>
+      <option value="model3">Self Attention</option>
+    </select>
+    <input type="submit" value="Upload" id="uploadButton">
+  </form>
+  <div id="imagePreviewContainer"></div>
+  <div id="captionContainer"></div>
+
+  <script>
+    // Handle form submission and file upload
+    document.getElementById('uploadForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      var fileInput = document.getElementById('fileInput');
+      var file = fileInput.files[0];
+      
+      var modelSelect = document.getElementById('modelSelect');
+      var selectedModel = modelSelect.value;
+
+      var formData = new FormData();
+      formData.append('file', file);
+      formData.append('model', selectedModel);
+
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', '/upload', true);
+      xhr.onload = function() {
+        if (xhr.status === 200) {
+          var response = JSON.parse(xhr.responseText);
+          console.log(response.caption[0])
+          var cap = response.caption[0].generated_text;
+          document.getElementById('captionContainer').innerText = cap;
+        }
+      };
+      xhr.send(formData);
+
+      // Display image preview
+      var reader = new FileReader();
+      reader.onload = function(event) {
+        var imagePreview = document.createElement('img');
+        imagePreview.sizes = '200px';
+        imagePreview.src = event.target.result;
+        document.getElementById('imagePreviewContainer').innerHTML = '';
+        document.getElementById('imagePreviewContainer').appendChild(imagePreview);
+      };
+      reader.readAsDataURL(file);
+    });
+  </script>
+</body>
+</html>
