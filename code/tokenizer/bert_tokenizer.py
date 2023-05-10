@@ -4,6 +4,7 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 import pickle
 import os 
 import numpy as np
+from transformers import BertTokenizer
 
 nlp = spacy.load("en_core_web_sm", disable=["tagger", "parser", "ner"])
 """
@@ -14,7 +15,7 @@ The only tokens we use are start, end, OOV and pad tokens.
 Currently, spacy preprocessing is in coco120k, flickr8k and flickr30k. But it is probably better here. When everything
 is working, we can change it and get it working. I'm not sure exactly what's the best standard
 """
-class TextPreprocessor:
+class BERTTextPreprocessor:
     """
     Constructor for Processor
     All_captions: List of captions --> up to 5 captions
@@ -25,31 +26,29 @@ class TextPreprocessor:
     def __init__(self, all_captions, max_caption_length=15, vocab_size=20000, use_spacy=True, pickle='tokenizer.pkl', pickle_action=False):
         self.use_spacy = use_spacy
         self.captions = self.process_captions(all_captions)
-        self.tokenizer = Tokenizer(num_words=vocab_size, oov_token='<unk>', filters='!"#$%&()*+.,-/:;=?@[\]^_`{|}~ ')
         
-       
+        # Load the pre-trained BERT tokenizer
+        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        self.tokenizer.add_tokens(['<start>', '<end>', '<pad>', '<OOV>'])
+        self.tokenizer.padding_side = "left"
+
         self.vocab_size = vocab_size
         self.max_caption_length = max_caption_length
 
-        self.tokenizer.fit_on_texts(self.captions)
         # Adding 4 because we have four special tokens - <pad>, <start>, <end>, <OOV>
-        self.tokenizer.word_index = {e: i + 4 for e, i in self.tokenizer.word_index.items()}
+        # self.tokenizer.vocab_size += 4
+        # self.tokenizer.get_vocab()['<start>'] = self.tokenizer.vocab_size - 4
+        # self.tokenizer.get_vocab()['<end>'] = self.tokenizer.vocab_size - 3
+        # self.tokenizer.get_vocab()['<pad>'] = self.tokenizer.vocab_size - 2
+        # self.tokenizer.get_vocab()['<OOV>'] = self.tokenizer.vocab_size - 1
 
-        # Adding the special tokens 
-        self.tokenizer.word_index['<pad>'] = 0
-        self.tokenizer.word_index['<start>'] = 1
-        self.tokenizer.word_index['<end>'] = 2
-        self.tokenizer.word_index['<OOV>'] = 3
-
-        self.tokenizer.index_word = {i: e for e, i in self.tokenizer.word_index.items()}
-
-        # Adjust the vocab_size to reflect the added special tokens
-        self.vocab_size = len(self.tokenizer.word_index) + 1
     def get_vocab_size(self):
-        return self.vocab_size
+        return self.tokenizer.vocab_size
+
     # getter method for captions
     def get_captions(self):
         return self.captions
+
     """
     Input: all captions --> list of captions
     Output: Processed/tokenized captions based on format
@@ -83,19 +82,17 @@ class TextPreprocessor:
     """
     def tokenize(self, captions):
         captions = ['<start>' + str(caption) + ' <end>' for caption in captions]
-        print(captions)
-        sequences = self.tokenizer.texts_to_sequences(captions)
-        padded_sequences = pad_sequences(sequences, maxlen=self.max_caption_length, padding='post')
-        return padded_sequences
+        sequences = [self.tokenizer.encode(caption, add_special_tokens=True, max_length=self.max_caption_length, truncation=True) for caption in captions]
+        return sequences
     """
     detokenizes sequence. This will help to visualize our model output at the end
     """
     def detokenize(self, sequences):
         def get_word(t):
             if isinstance(t, (list, np.ndarray)):  # If t is a list or an array
-                return ' '.join(self.tokenizer.index_word.get(i, '<unk>') for i in t if i != 0)
+                return ' '.join(self.tokenizer.decode(i, skip_special_tokens=True) for i in t if i != 0)
             else:  # If t is a single value
-                return self.tokenizer.index_word.get(t, '<unk>') if t != 0 else ''
+                return self.tokenizer.decode(t, skip_special_tokens=True) if t != 0 else ''
 
         caption = ' '.join(get_word(token) for token in sequences)
         return caption
